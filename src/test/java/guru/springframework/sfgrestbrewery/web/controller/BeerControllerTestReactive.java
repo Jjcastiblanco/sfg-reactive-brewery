@@ -3,6 +3,9 @@ package guru.springframework.sfgrestbrewery.web.controller;
 import guru.springframework.sfgrestbrewery.bootstrap.BeerLoader;
 import guru.springframework.sfgrestbrewery.services.BeerService;
 import guru.springframework.sfgrestbrewery.web.model.BeerDto;
+import guru.springframework.sfgrestbrewery.web.model.BeerPagedList;
+import io.netty.handler.codec.string.LineSeparator;
+import org.assertj.core.util.Arrays;
 import org.hamcrest.CoreMatchers;
 import org.hamcrest.Matcher;
 import org.hamcrest.Matchers;
@@ -13,8 +16,12 @@ import org.mockito.Mockito;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.autoconfigure.web.reactive.WebFluxTest;
 import org.springframework.boot.test.mock.mockito.MockBean;
+import org.springframework.data.domain.PageRequest;
+import org.springframework.data.domain.Pageable;
 import org.springframework.test.web.reactive.server.WebTestClient;
 
+import java.lang.reflect.Array;
+import java.util.List;
 import java.util.UUID;
 
 import static org.junit.jupiter.api.Assertions.*;
@@ -52,5 +59,29 @@ class BeerControllerTestReactive {
                 .expectStatus().isOk()
                 .expectBody(BeerDto.class)
                 .value(BeerDto::getBeerName, Matchers.equalTo(validBeer.getBeerName()));
+    }
+
+    @Test
+    void getBeerUpc() {
+        BDDMockito.given(beerService.getByUpc(Mockito.anyString())).willReturn(validBeer);
+
+        webTestClient.get()
+                .uri("/api/v1/beerUpc/" + validBeer.getUpc())
+                .exchange()
+                .expectStatus().isOk()
+                .expectBody(BeerDto.class)
+                .value(BeerDto::getBeerName, Matchers.equalTo(validBeer.getBeerName()));
+    }
+
+    @Test
+    void getListBeers() {
+        List<BeerDto> beerDtos = List.of(validBeer);
+        BeerPagedList beerPagedList = new BeerPagedList(beerDtos, PageRequest.of(1, 1), beerDtos.size());
+        BDDMockito.given(beerService.listBeers(Mockito.any(), Mockito.any(), Mockito.any(), Mockito.any())).willReturn(beerPagedList);
+        webTestClient.get()
+                .uri("/api/v1/beer")
+                .exchange()
+                .expectStatus().isOk()
+                .expectBodyList(BeerPagedList.class);
     }
 }
