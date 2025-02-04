@@ -19,6 +19,7 @@ import org.springframework.boot.test.mock.mockito.MockBean;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Pageable;
 import org.springframework.test.web.reactive.server.WebTestClient;
+import reactor.core.publisher.Mono;
 
 import java.lang.reflect.Array;
 import java.util.List;
@@ -51,7 +52,7 @@ class BeerControllerTestReactive {
     void getBeerById() {
         UUID uuid = UUID.randomUUID();
         //BDDMockito sigue el estilo BDD (Behavior-Driven Development), que es más descriptivo y se alinea mejor con ciertas prácticas de desarrollo.
-        BDDMockito.given(beerService.getById(Mockito.any(), Mockito.any())).willReturn(validBeer);
+        BDDMockito.given(beerService.getById(Mockito.any(), Mockito.any())).willReturn(Mono.just(validBeer));
 
         webTestClient.get()
                 .uri("/api/v1/beer/" + uuid)
@@ -63,7 +64,7 @@ class BeerControllerTestReactive {
 
     @Test
     void getBeerUpc() {
-        BDDMockito.given(beerService.getByUpc(Mockito.anyString())).willReturn(validBeer);
+        BDDMockito.given(beerService.getByUpc(Mockito.anyString())).willReturn(Mono.just(validBeer));
 
         webTestClient.get()
                 .uri("/api/v1/beerUpc/" + validBeer.getUpc())
@@ -77,7 +78,7 @@ class BeerControllerTestReactive {
     void getListBeers() {
         List<BeerDto> beerDtos = List.of(validBeer);
         BeerPagedList beerPagedList = new BeerPagedList(beerDtos, PageRequest.of(1, 1), beerDtos.size());
-        BDDMockito.given(beerService.listBeers(Mockito.any(), Mockito.any(), Mockito.any(), Mockito.any())).willReturn(beerPagedList);
+        BDDMockito.given(beerService.listBeers(Mockito.any(), Mockito.any(), Mockito.any(), Mockito.any())).willReturn(Mono.just(beerPagedList));
         webTestClient.get()
                 .uri("/api/v1/beer")
                 .exchange()

@@ -11,6 +11,7 @@ import org.springframework.boot.test.autoconfigure.web.servlet.WebMvcTest;
 import org.springframework.boot.test.mock.mockito.MockBean;
 import org.springframework.http.MediaType;
 import org.springframework.test.web.servlet.MockMvc;
+import reactor.core.publisher.Mono;
 
 import java.util.UUID;
 
@@ -37,7 +38,7 @@ public class BeerControllerTest {
 
     @BeforeEach
     public void setUp() {
-        validBeer = BeerDto.builder().id(UUID.randomUUID())
+        validBeer = BeerDto.builder().id(1)
                 .beerName("Beer1")
                 .beerStyle("PALE_ALE")
                 .upc(BeerLoader.BEER_2_UPC)
@@ -46,7 +47,7 @@ public class BeerControllerTest {
 
     @Test
     public void getBeer() throws Exception {
-        given(beerService.getById(any(UUID.class), any())).willReturn(validBeer);
+        given(beerService.getById(any(), any())).willReturn(Mono.just(validBeer));
 
         mockMvc.perform(get("/api/v1/beer/" + validBeer.getId().toString()).accept(MediaType.APPLICATION_JSON))
                 .andExpect(status().isOk())
@@ -60,7 +61,7 @@ public class BeerControllerTest {
         //given
         BeerDto beerDto = validBeer;
         beerDto.setId(null);
-        BeerDto savedDto = BeerDto.builder().id(UUID.randomUUID()).beerName("New Beer").build();
+        BeerDto savedDto = BeerDto.builder().id(1).beerName("New Beer").build();
         String beerDtoJson = objectMapper.writeValueAsString(beerDto);
 
         given(beerService.saveNewBeer(any())).willReturn(savedDto);

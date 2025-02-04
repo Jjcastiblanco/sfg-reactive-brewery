@@ -9,11 +9,20 @@ import guru.springframework.sfgrestbrewery.web.model.BeerStyleEnum;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.cache.annotation.Cacheable;
-import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageRequest;
+import org.springframework.data.r2dbc.core.R2dbcEntityTemplate;
+import org.springframework.data.relational.core.query.Query;
 import org.springframework.stereotype.Service;
+import org.springframework.util.StringUtils;
+import reactor.core.publisher.Mono;
 
+import java.util.List;
 import java.util.UUID;
+import java.util.stream.Collectors;
+
+import static org.springframework.data.relational.core.query.Criteria.where;
+import static org.springframework.data.relational.core.query.Query.empty;
+import static org.springframework.data.relational.core.query.Query.query;
 
 /**
  * Created by jt on 2019-04-20.
@@ -24,65 +33,52 @@ import java.util.UUID;
 public class BeerServiceImpl implements BeerService {
     private final BeerRepository beerRepository;
     private final BeerMapper beerMapper;
+    private final R2dbcEntityTemplate template;
 
     @Cacheable(cacheNames = "beerListCache", condition = "#showInventoryOnHand == false ")
     @Override
-    public BeerPagedList listBeers(String beerName, BeerStyleEnum beerStyle, PageRequest pageRequest, Boolean showInventoryOnHand) {
+    public Mono<BeerPagedList> listBeers(String beerName, BeerStyleEnum beerStyle, PageRequest pageRequest, Boolean showInventoryOnHand) {
+        Query query = null;
 
-        BeerPagedList beerPagedList = null;
-        Page<Beer> beerPage;
+        if (!StringUtils.isEmpty(beerName) && !StringUtils.isEmpty(beerStyle)) {
+            //search both
+            query = query(where("beerName").is(beerName).and("beerStyle").is(beerStyle));
+        } else if (!StringUtils.isEmpty(beerName) && StringUtils.isEmpty(beerStyle)) {
+            //search beer_service name
+            query = query(where("beerName").is(beerName));
+        } else if (StringUtils.isEmpty(beerName) && !StringUtils.isEmpty(beerStyle)) {
+            //search beer_service style
+            query = query(where("beerStyle").is(beerStyle));
+        } else {
+            query = empty();
+        }
+        Mono<Long> totalCount = template.count(query, Beer.class);
 
-//        if (!StringUtils.isEmpty(beerName) && !StringUtils.isEmpty(beerStyle)) {
-//            //search both
-//            beerPage = beerRepository.findAllByBeerNameAndBeerStyle(beerName, beerStyle, pageRequest);
-//        } else if (!StringUtils.isEmpty(beerName) && StringUtils.isEmpty(beerStyle)) {
-//            //search beer_service name
-//            beerPage = beerRepository.findAllByBeerName(beerName, pageRequest);
-//        } else if (StringUtils.isEmpty(beerName) && !StringUtils.isEmpty(beerStyle)) {
-//            //search beer_service style
-//            beerPage = beerRepository.findAllByBeerStyle(beerStyle, pageRequest);
-//        } else {
-//            beerPage = beerRepository.findAll(pageRequest);
-//        }
-//
-//        if (showInventoryOnHand){
-//            beerPagedList = new BeerPagedList(beerPage
-//                    .getContent()
-//                    .stream()
-//                    .map(beerMapper::beerToBeerDtoWithInventory)
-//                    .collect(Collectors.toList()),
-//                    PageRequest
-//                            .of(beerPage.getPageable().getPageNumber(),
-//                                    beerPage.getPageable().getPageSize()),
-//                    beerPage.getTotalElements());
-//        } else {
-//            beerPagedList = new BeerPagedList(beerPage
-//                    .getContent()
-//                    .stream()
-//                    .map(beerMapper::beerToBeerDto)
-//                    .collect(Collectors.toList()),
-//                    PageRequest
-//                            .of(beerPage.getPageable().getPageNumber(),
-//                                    beerPage.getPageable().getPageSize()),
-//                    beerPage.getTotalElements());
-//        }
-
-        return beerPagedList;
+        return template.select(Beer.class)
+                .matching(query.with(pageRequest))
+                .all()
+                .map(beerMapper::beerToBeerDto)
+                .collect(Collectors.toList())
+                .zipWith(totalCount) // Combinar la lista de resultados con el total de elementos
+                .map(tuple -> {
+                    List<BeerDto> beers = tuple.getT1(); // Lista de elementos en la página
+                    long totalElements = tuple.getT2(); // Total de elementos en la base de datos
+                    return new BeerPagedList(beers, PageRequest.of(
+                            pageRequest.getPageNumber(),
+                            pageRequest.getPageSize()),
+                            totalElements); // Pasar el total de elementos al constructor
+                });
     }
 
     @Cacheable(cacheNames = "beerCache", key = "#beerId", condition = "#showInventoryOnHand == false ")
     @Override
-    public BeerDto getById(UUID beerId, Boolean showInventoryOnHand) {
-//        if (showInventoryOnHand) {
-//            return beerMapper.beerToBeerDtoWithInventory(
-//                    beerRepository.findById(beerId).orElseThrow(NotFoundException::new)
-//            );
-//        } else {
-//            return beerMapper.beerToBeerDto(
-//                    beerRepository.findById(beerId).orElseThrow(NotFoundException::new)
-//            );
-//        }
-        return null;
+    public Mono<BeerDto> getById(Integer beerId, Boolean showInventoryOnHand) {
+        if (showInventoryOnHand) {
+            return beerRepository.findById(beerId)
+                            .map(beerMapper::beerToBeerDtoWithInventory);
+        } else {
+            return beerRepository.findById(beerId).map(beerMapper::beerToBeerDto);
+        }
     }
 
     @Override
@@ -106,12 +102,12 @@ public class BeerServiceImpl implements BeerService {
 
     @Cacheable(cacheNames = "beerUpcCache")
     @Override
-    public BeerDto getByUpc(String upc) {
-        return beerMapper.beerToBeerDto(beerRepository.findByUpc(upc));
+    public Mono<BeerDto> getByUpc(String upc) {
+        return beerRepository.findByUpc(upc).map(beerMapper::beerToBeerDto);
     }
 
     @Override
-    public void deleteBeerById(UUID beerId) {
+    public void deleteBeerById(Integer beerId) {
         beerRepository.deleteById(beerId);
     }
 }
