@@ -15,6 +15,7 @@ import reactor.core.publisher.Flux;
 import reactor.core.publisher.Mono;
 
 import java.util.UUID;
+import java.util.concurrent.atomic.AtomicInteger;
 
 /**
  * Created by jt on 2019-04-20.
@@ -80,13 +81,15 @@ public class BeerController {
     }
 
     @PostMapping(path = "beer")
-    public ResponseEntity saveNewBeer(@RequestBody @Validated BeerDto beerDto){
+    public ResponseEntity<Mono<Void>> saveNewBeer(@RequestBody @Validated BeerDto beerDto){
 
-        BeerDto savedBeer = beerService.saveNewBeer(beerDto);
+        AtomicInteger atomicInteger = new AtomicInteger();
+
+        beerService.saveNewBeer(beerDto).subscribe(beerDto1 -> atomicInteger.set(beerDto1.getId()));
 
         return ResponseEntity
                 .created(UriComponentsBuilder
-                        .fromHttpUrl("http://api.springframework.guru/api/v1/beer/" + savedBeer.getId().toString())
+                        .fromHttpUrl("http://api.springframework.guru/api/v1/beer/" + atomicInteger.get())
                         .build().toUri())
                 .build();
     }

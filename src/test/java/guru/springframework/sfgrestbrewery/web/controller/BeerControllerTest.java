@@ -64,7 +64,7 @@ public class BeerControllerTest {
         BeerDto savedDto = BeerDto.builder().id(1).beerName("New Beer").build();
         String beerDtoJson = objectMapper.writeValueAsString(beerDto);
 
-        given(beerService.saveNewBeer(any())).willReturn(savedDto);
+        given(beerService.saveNewBeer(any())).willReturn(Mono.just(savedDto));
 
         mockMvc.perform(post("/api/v1/beer/")
                 .contentType(MediaType.APPLICATION_JSON)
