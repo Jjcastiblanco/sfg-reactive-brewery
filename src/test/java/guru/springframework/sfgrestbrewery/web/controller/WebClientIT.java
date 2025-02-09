@@ -14,6 +14,7 @@ import org.springframework.web.reactive.function.client.WebClient;
 import reactor.core.publisher.Mono;
 import reactor.core.scheduler.Schedulers;
 import reactor.netty.http.client.HttpClient;
+import reactor.test.StepVerifier;
 
 import java.math.BigDecimal;
 import java.util.concurrent.CountDownLatch;
@@ -37,6 +38,36 @@ public class WebClientIT {
                 .baseUrl(BASE_URL)
                 .clientConnector(new ReactorClientHttpConnector(HttpClient.create().wiretap(true)))
                 .build();
+    }
+
+
+    @Test
+    void testUpdateBeer(){
+        StepVerifier.create(
+                        webClient.get().uri("/api/v1/beer")
+                                .accept(MediaType.APPLICATION_JSON)
+                                .retrieve()
+                                .bodyToMono(BeerPagedList.class)
+                                .flatMap(pagedList -> {
+                                    BeerDto beerDto = pagedList.getContent().get(0);
+                                    BeerDto updatePayload = BeerDto.builder().beerName("JTsUpdate")
+                                            .beerStyle(beerDto.getBeerStyle())
+                                            .upc(beerDto.getUpc())
+                                            .price(beerDto.getPrice())
+                                            .build();
+
+                                    return webClient.put().uri("/api/v1/beer/" + beerDto.getId())
+                                            .contentType(MediaType.APPLICATION_JSON)
+                                            .body(BodyInserters.fromValue(updatePayload))
+                                            .retrieve().toBodilessEntity()
+                                            .thenReturn(beerDto.getId());
+                                })
+                                .flatMap(id -> webClient.get().uri("/api/v1/beer/" + id)
+                                        .accept(MediaType.APPLICATION_JSON)
+                                        .retrieve().bodyToMono(BeerDto.class))
+                )
+                .assertNext(savedDto -> assertThat(savedDto.getBeerName()).isEqualTo("JTsUpdate"))
+                .verifyComplete();
     }
 
     @Test

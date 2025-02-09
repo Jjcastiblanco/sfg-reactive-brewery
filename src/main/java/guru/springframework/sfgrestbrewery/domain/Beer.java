@@ -8,7 +8,7 @@ import lombok.NoArgsConstructor;
 import org.springframework.data.annotation.Id;
 
 import java.math.BigDecimal;
-import java.sql.Timestamp;
+import java.time.LocalDateTime;
 
 /**
  * Created by jt on 2019-05-25.
@@ -40,8 +40,8 @@ public class Beer {
 
 //    @CreationTimestamp
 //    @Column(updatable = false)
-    private Timestamp createdDate;
+    private LocalDateTime createdDate;
 
 //    @UpdateTimestamp
-    private Timestamp lastModifiedDate;
+    private LocalDateTime lastModifiedDate;
 }
